@@ -15,59 +15,49 @@ fn unpack(s: u32) -> (u8, u8, u8, u8) {
     (thousand as u8, hundred as u8, ten as u8, one as u8)
 }
 
+#[allow(unused)]
 fn repack(s: (u8, u8, u8, u8)) -> u32 {
     (s.3 as u32)*1000 + (s.2 as u32)*100 + (s.1 as u32)*10 + (s.0 as u32)
 }
 
-fn gen_liam() -> Vec<u8> {
-    let mut range: Vec<i32> = (1..=10_000).collect();
+fn gen() -> Result<Vec<u8>, String> {
+    let mut nums_left: Vec<i32> = (1..=10_000).collect();
     let mut rng = thread_rng();
-    range.shuffle(&mut rng);
+    nums_left.shuffle(&mut rng);
 
-    let first = range.pop().unwrap();
+    let first = nums_left.pop().unwrap();
     let (thousand, hundred, ten, one) = unpack(first as u32);
     let mut s = vec![thousand, hundred, ten, one];
 
-    while range.len() > 0 {
+    while nums_left.len() > 0 {
         let (goal_thousand, goal_hundred, goal_ten) = (s[s.len()-3], s[s.len()-2], s[s.len()-1]);
-        let mut index = range.len() - 1;
-        let mut best_overlap = 0;
-        for (i, num) in range.iter().enumerate().rev() {
+        let mut arg_max = nums_left.len();
+        for (i, num) in nums_left.iter().enumerate().rev() {
             let (thousand, hundred, ten, _) = unpack(*num as u32);
-            let overlap = if thousand == goal_thousand { 1 } else { 0 } +
-                         if hundred == goal_hundred { 1 } else { 0 } +
-                         if ten == goal_ten { 1 } else { 0 };
-            if overlap > best_overlap {
-                best_overlap = overlap;
-                index = i;
+            if thousand == goal_thousand && hundred == goal_hundred && ten == goal_ten {
+                arg_max = i;
+                break;
             }
         }
-        let num = range.remove(index);
-        let (thousand, hundred, ten, one) = unpack(num as u32);
-        if best_overlap == 3 {
-            s.push(one);
-        } else if best_overlap == 2 {
-            s.push(ten);
-            s.push(one);
-        } else if best_overlap == 1 {
-            s.push(hundred);
-            s.push(ten);
-            s.push(one);
-        } else {
-            s.push(thousand);
-            s.push(hundred);
-            s.push(ten);
-            s.push(one);
+        if arg_max == nums_left.len() {
+            return Err("no more numbers to add".to_string());
         }
+        let num = nums_left.remove(arg_max);
+        let (_, _, _, one) = unpack(num as u32);
+        s.push(one);
     }
-    s
+    Ok(s)
 }
 
 fn main() {
-    let mut s = gen_liam();
-    while s.len() != 10_003 {
-        s = gen_liam();
+    let filename = "/tmp/c.txt";
+
+    let mut s = gen();
+    while !s.is_ok() {
+        s = gen();
     }
-    println!("len {}", s.len());
-    std::fs::write("/tmp/c.txt", to_s(&s)).unwrap();
+    let s = s.unwrap();
+
+    println!("found! length {}, written to {}", s.len(), filename);
+    std::fs::write(filename, to_s(&s)).unwrap();
 }
